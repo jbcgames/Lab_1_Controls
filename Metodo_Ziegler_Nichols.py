@@ -29,3 +29,12 @@ else:
     tiempo_escalon = tiempo[idx_escalon:]
     T1_escalon = T1[idx_escalon:]
     pwm_escalon = pwm[idx_escalon:]
+plt.figure()
+plt.plot(tiempo, T1, label='Temperatura T1')
+plt.axvline(t_escalon, linestyle='--', color='r', label='Instante de escalón')
+plt.xlabel('Tiempo [s]')
+plt.ylabel('Temperatura [°C]')
+plt.title('Respuesta de T1 al escalón de PWM')
+plt.grid(True)
+plt.legend()
+plt.show()
