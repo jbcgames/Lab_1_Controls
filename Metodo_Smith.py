@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # 1. Leer los datos
-df = pd.read_csv('Datos.txt')
+df = pd.read_csv('https://raw.githubusercontent.com/jbcgames/Lab_1_Controls/main/Datos.txt')
 
 # 2. Extraer columnas
 tiempo = df['Tiempo (s)'].values
