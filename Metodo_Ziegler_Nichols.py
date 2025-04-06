@@ -6,9 +6,8 @@ from scipy.signal import savgol_filter
 # 1. Leer los datos
 df = pd.read_csv('https://raw.githubusercontent.com/jbcgames/Lab_1_Controls/main/Datos.txt')
 
-# Asegurarse de usar los nombres exactos de las columnas:
 tiempo = df['Tiempo (s)'].values
-T1 = df[' T1 (C)'].values   # Revisar si el espacio inicial es correcto
+T1 = df[' T1 (C)'].values   
 pwm = df[' PWM_Heater1'].values
 
 # 2. Detectar el instante donde se aplica el escalón (PWM: 0 -> valor positivo)
@@ -31,10 +30,8 @@ pwm = pwm[mask]
 
 
 # 4. Aplicar un filtro (Savitzky-Golay) a la señal de T1
-#    - window_length: tamaño de la ventana (debe ser impar y >= polyorder)
-#    - polyorder: grado del polinomio
-# Ajustar estos valores según la cantidad de ruido y la frecuencia de muestreo
-window_length = 51  # prueba con 21, 51, etc. según el tamaño de tus datos
+
+window_length = 51 
 polyorder = 3
 T1_smooth = savgol_filter(T1, window_length, polyorder)
 
@@ -48,7 +45,6 @@ pwm_step = pwm[0] if pwm[0] > 0 else pwm[np.where(pwm > 0)[0][0]]
 Kp = delta_y / pwm_step
 
 # 7. Hallar el punto de máxima pendiente usando T1_smooth
-#    Calculamos la derivada de la señal suavizada
 dT1_dt_smooth = np.gradient(T1_smooth, tiempo)
 idx_max_slope = np.argmax(dT1_dt_smooth)
 
