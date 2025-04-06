@@ -2,20 +2,29 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# 1. Leer los datos
-df = pd.read_csv('https://raw.githubusercontent.com/jbcgames/Lab_1_Controls/main/Datos.txt')
+# Filtro Savitzky-Golay
+from scipy.signal import savgol_filter
 
-# 2. Extraer columnas
+# 1. Leer los datos desde el repositorio
+url_datos = 'https://raw.githubusercontent.com/jbcgames/Lab_1_Controls/main/Datos.txt'
+df = pd.read_csv(url_datos)
+
+# 2. Extraer columnas (verifica que los nombres coincidan)
 tiempo = df['Tiempo (s)'].values
 T1 = df[' T1 (C)'].values
 pwm = df[' PWM_Heater1'].values
 
-# 3. Detectar el instante donde se aplica el escalón
+# 2.1. Descartar datos a partir de t = 450 s
+mask = (tiempo <= 450)
+tiempo = tiempo[mask]
+T1 = T1[mask]
+pwm = pwm[mask]
+
+# 3. Detectar el instante donde se aplica el escalón (PWM: 0 -> valor positivo)
 indices_escalon = np.where((pwm[:-1] == 0) & (pwm[1:] > 0))[0]
 if len(indices_escalon) == 0:
-    print("No se detectó un escalón.")
+    print("No se detectó un escalón (0 -> valor>0) en PWM.")
     exit()
-
 idx_escalon = indices_escalon[0]
 t_escalon = tiempo[idx_escalon + 1]
 print(f"Escalón detectado en t = {t_escalon:.2f} s")
@@ -23,29 +32,38 @@ print(f"Escalón detectado en t = {t_escalon:.2f} s")
 # 4. Recortar datos desde el escalón en adelante
 tiempo = tiempo[idx_escalon:]
 T1 = T1[idx_escalon:]
+pwm = pwm[idx_escalon:]
 
-# 5. Determinar valores inicial y final
-y0 = T1[0]
-yf = T1[-1]
+# --- APLICAMOS FILTRO Savitzky–Golay A LA SEÑAL T1 ---
+# Ajusta window_length y polyorder según tu muestreo y nivel de ruido
+window_length = 31  # Debe ser impar; pruébalo con 21, 31, 51, etc.
+polyorder = 3       # Grado del polinomio de ajuste
+T1_smooth = savgol_filter(T1, window_length, polyorder)
+
+# 5. Determinar valores inicial y final (usaremos la señal suavizada para la identificación)
+y0 = T1_smooth[0]
+yf = T1_smooth[-1]
 delta_y = yf - y0
 
 # 6. Calcular valores objetivo al 28.3% y 63.2% del cambio
 y_28 = y0 + 0.283 * delta_y
 y_63 = y0 + 0.632 * delta_y
 
-# 7. Encontrar tiempos donde se alcanza ese valor
-t_28 = tiempo[np.argmin(np.abs(T1 - y_28))]
-t_63 = tiempo[np.argmin(np.abs(T1 - y_63))]
+# 7. Encontrar los instantes donde se alcanza cada valor en la señal suavizada
+t_28 = tiempo[np.argmin(np.abs(T1_smooth - y_28))]
+t_63 = tiempo[np.argmin(np.abs(T1_smooth - y_63))]
 
-# 8. Calcular constantes del modelo
-tau = 1.5 * (t_63 - t_28)
-L = t_63 - tau
-K = delta_y / (pwm[idx_escalon + 1])  # Asumiendo escalón de PWM
+# 8. Calcular las constantes del modelo (método de Smith)
+tau = 1.5 * (t_63 - t_28)   # Constante de tiempo
+L = t_63 - tau              # Tiempo muerto (retardo)
+# Ganancia del proceso (K), usando la amplitud del escalón PWM detectado
+#   Asumimos que pwm[idx_escalon+1] es la magnitud del escalón
+K = delta_y / pwm[idx_escalon + 1]
 
-print(f"Modelo aproximado:")
-print(f"  Ganancia (K) = {K:.3f}")
-print(f"  Constante de tiempo (tau) = {tau:.2f} s")
-print(f"  Retardo (L) = {L:.2f} s")
+print(f"\nModelo aproximado (método de Smith, con filtrado):")
+print(f"  Ganancia (K)           = {K:.3f}")
+print(f"  Constante de tiempo τ  = {tau:.2f} s")
+print(f"  Retardo (L)            = {L:.2f} s")
 
 # 9. Simular el modelo de primer orden con retardo
 t_modelo = tiempo
@@ -55,13 +73,17 @@ for i, t in enumerate(t_modelo):
     if t < L:
         respuesta_modelo[i] = y0
     else:
-        respuesta_modelo[i] = y0 + K * pwm[idx_escalon + 1] * (1 - np.exp(-(t - L) / tau))
+        # y(t) = y0 + K*(Escalon)*(1 - e^(-(t - L)/tau))
+        respuesta_modelo[i] = y0 + K * pwm[idx_escalon + 1] * (1 - np.exp(-(t - L)/tau))
 
 # 10. Graficar comparación
-plt.figure()
-plt.plot(tiempo, T1, label='Datos reales')
-plt.plot(t_modelo, respuesta_modelo, '--', label='Modelo de Smith')
-plt.axvline(L, color='gray', linestyle='--', label='Tiempo muerto')
+plt.figure(figsize=(8,5))
+plt.plot(tiempo, T1, label='Datos originales', alpha=0.7)
+plt.plot(tiempo, T1_smooth, label='Datos suavizados (Savitzky-Golay)')
+plt.plot(t_modelo, respuesta_modelo, '--', label='Modelo FOPDT (Smith)')
+
+# Referencia del tiempo muerto
+plt.axvline(L, color='gray', linestyle='--', label='Tiempo muerto L')
 plt.xlabel('Tiempo [s]')
 plt.ylabel('Temperatura [°C]')
 plt.title('Identificación con Método de Smith')
