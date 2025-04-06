@@ -1,8 +1,6 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
-# Filtro Savitzky-Golay
 from scipy.signal import savgol_filter
 
 # 1. Leer los datos desde el repositorio
@@ -35,9 +33,8 @@ T1 = T1[idx_escalon:]
 pwm = pwm[idx_escalon:]
 
 # --- APLICAMOS FILTRO Savitzky–Golay A LA SEÑAL T1 ---
-# Ajusta window_length y polyorder según tu muestreo y nivel de ruido
-window_length = 31  # Debe ser impar; pruébalo con 21, 31, 51, etc.
-polyorder = 3       # Grado del polinomio de ajuste
+window_length = 31  
+polyorder = 3 
 T1_smooth = savgol_filter(T1, window_length, polyorder)
 
 # 5. Determinar valores inicial y final (usaremos la señal suavizada para la identificación)
